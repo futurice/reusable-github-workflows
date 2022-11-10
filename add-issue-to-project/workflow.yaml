@@ -1,0 +1,61 @@
+name: Reusable workflow that adds a given issue node ID to a project board
+
+on:
+  workflow_call:
+    inputs:
+      issueNodeId:
+        description: 'The node ID of the GitHub issue to add to the project'
+        required: true
+        type: string
+      projectNumber:
+        description: 'The number of the project where the issue will be added, e.g. 105'
+        required: false
+        type: number
+      projectOrg:
+        description: 'Name of the organization that owns the project, default futurice.'
+        required: false
+        type: string
+        default: futurice
+    secrets:
+      githubToken:
+        description: 'A GH token that ONLY needs scopes for public_repo, read:org, read:project.'
+        required: true
+
+jobs:
+  add-issue-to-project:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query project board & add issue
+        run: |
+          # Run the query to get the Project ID
+          gh api graphql -f query='
+            query getProjectId($org: String!, $number: Int!) {
+                organization(login: $org) {
+                  projectV2(number: $number) {
+                    id
+                    title
+                  }
+                }
+            }' -f org=$ORGANIZATION -F number=$PROJECT_NUMBER > project_data.json
+
+          # Use jq to parse the output and get the project ID 
+          PROJECT_ID=$(jq '.data.organization.projectV2.id' project_data.json)
+          PROJECT_TITLE=$(jq '.data.organization.projectV2.title' project_data.json)
+
+          echo "Adding issue to project ${PROJECT_TITLE}"
+
+          # Using the Issue Node ID, add the issue to the project
+          
+          # Run the query to get the Project ID
+          gh api graphql -f query='
+            mutation addIssueToProject($project:ID!, $issue:ID!) {
+              addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) {
+                  clientMutationId
+              }
+            }' -f project=$PROJECT_ID -f issue=$ISSUE_ID > issue_mutation.json
+
+        env:
+          GH_TOKEN: ${{ secrets.githubToken }}
+          ISSUE_ID: ${{ inputs.issueNodeId }}
+          ORGANIZATION: ${{ inputs.projectOrg }}
+          PROJECT_NUMBER: ${{ inputs.projectNumber }}
