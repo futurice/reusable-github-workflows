@@ -45,8 +45,6 @@ jobs:
           echo "Adding issue to project ${PROJECT_TITLE}"
 
           # Using the Issue Node ID, add the issue to the project
-          
-          # Run the query to get the Project ID
           gh api graphql -f query='
             mutation addIssueToProject($project:ID!, $issue:ID!) {
               addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) {
